@@ -272,27 +272,31 @@ export class GeoFirestoreQuery {
    * Removes unnecessary Firebase queries which are currently being queried.
    */
   private _cleanUpCurrentGeohashesQueried(): void {
-    let keys: string[] = Object.keys(this._currentGeohashesQueried);
-    keys.forEach((geohashQueryStr: string) => {
-      const queryState: any = this._currentGeohashesQueried[geohashQueryStr];
-      if (queryState.active === false) {
-        const query = this._stringToQuery(geohashQueryStr);
-        // Delete the geohash since it should no longer be queried
-        this._cancelGeohashQuery(query, queryState);
-        delete this._currentGeohashesQueried[geohashQueryStr];
-      }
-    });
+    let keys: string[] = this._currentGeohashesQueried ? Object.keys(this._currentGeohashesQueried) : [];
+    if (this._currentGeohashesQueried) {
+      keys.forEach((geohashQueryStr: string) => {
+        const queryState: any = this._currentGeohashesQueried[geohashQueryStr];
+        if (queryState.active === false) {
+          const query = this._stringToQuery(geohashQueryStr);
+          // Delete the geohash since it should no longer be queried
+          this._cancelGeohashQuery(query, queryState);
+          delete this._currentGeohashesQueried[geohashQueryStr];
+        }
+      });
+    }
 
     // Delete each location which should no longer be queried
-    keys = Object.keys(this._locationsTracked);
-    keys.forEach((key: string) => {
-      if (!this._geohashInSomeQuery(this._locationsTracked[key].geohash)) {
-        if (this._locationsTracked[key].isInQuery) {
-          throw new Error('Internal State error, trying to remove location that is still in query');
+    if (this._locationsTracked) {
+      keys = Object.keys(this._locationsTracked);
+      keys.forEach((key: string) => {
+        if (!this._geohashInSomeQuery(this._locationsTracked[key].geohash)) {
+          if (!this._locationsTracked[key].isInQuery) {
+            delete this._locationsTracked[key];
+          }
+          // else throw new Error('Internal State error, trying to remove location that is still in query');
         }
-        delete this._locationsTracked[key];
-      }
-    });
+      });
+    }
 
     // Specify that this is done cleaning up the current geohashes queried
     this._geohashCleanupScheduled = false;
@@ -339,9 +343,10 @@ export class GeoFirestoreQuery {
    * @returns Returns true if the geohash is part of any of the current geohash queries.
    */
   private _geohashInSomeQuery(geohash: string): boolean {
+    if (!this._currentGeohashesQueried) return false
     const keys: string[] = Object.keys(this._currentGeohashesQueried);
     for (const queryStr of keys) {
-      if (queryStr in this._currentGeohashesQueried) {
+      if (this._currentGeohashesQueried && queryStr in this._currentGeohashesQueried) {
         const query = this._stringToQuery(queryStr);
         if (geohash >= query[0] && geohash <= query[1]) {
           return true;
